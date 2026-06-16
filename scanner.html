@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>📷 Device Scanner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    min-height: 100vh;
+    color: #e2e8f0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    padding: 18px 20px 14px;
+    text-align: center;
+    border-bottom: 2px solid #4f46e5;
+  }
+  .header h1 { font-size: 1.15rem; font-weight: 800; color: #a5b4fc; letter-spacing: 0.5px; }
+  .header p  { font-size: 0.75rem; color: #6366f1; margin-top: 3px; }
+
+  /* ── URL CONFIG ── */
+  .url-bar {
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .url-bar input {
+    flex: 1;
+    background: #0f172a;
+    border: 1.5px solid #334155;
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: #e2e8f0;
+    font-size: 0.78rem;
+    outline: none;
+  }
+  .url-bar input:focus { border-color: #6366f1; }
+  .url-bar input::placeholder { color: #475569; }
+  .btn-connect {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .connected-badge {
+    display: none;
+    font-size: 0.72rem;
+    color: #34d399;
+    font-weight: 700;
+    text-align: center;
+    padding: 5px 16px;
+    background: #064e3b22;
+    border-bottom: 1px solid #064e3b;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content { padding: 16px; }
+
+  /* ── CAMERA BOX ── */
+  .camera-wrap {
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid #4f46e5;
+    position: relative;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .camera-placeholder {
+    text-align: center;
+    padding: 30px 20px;
+    color: #6366f1;
+  }
+  .camera-placeholder .icon { font-size: 3rem; margin-bottom: 10px; }
+  .camera-placeholder p { font-size: 0.82rem; color: #94a3b8; }
+
+  /* override html5-qrcode default styles */
+  #reader { width: 100% !important; border: none !important; }
+  #reader video { border-radius: 14px; }
+  #reader__scan_region { border: none !important; }
+  #reader__dashboard { display: none !important; }
+
+  /* scan line animation */
+  .scan-line {
+    display: none;
+    position: absolute;
+    left: 10%; width: 80%; height: 2px;
+    background: linear-gradient(90deg, transparent, #a5b4fc, transparent);
+    animation: scanMove 1.8s ease-in-out infinite;
+    border-radius: 2px;
+    box-shadow: 0 0 8px #6366f1;
+    pointer-events: none;
+    z-index: 10;
+  }
+  @keyframes scanMove {
+    0%   { top: 15%; }
+    50%  { top: 80%; }
+    100% { top: 15%; }
+  }
+  .scan-line.active { display: block; }
+
+  /* corner brackets overlay */
+  .corners {
+    display: none;
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 9;
+  }
+  .corners.active { display: block; }
+  .corners::before, .corners::after,
+  .corners span::before, .corners span::after {
+    content: '';
+    position: absolute;
+    width: 28px; height: 28px;
+    border-color: #a5b4fc;
+    border-style: solid;
+  }
+  .corners::before  { top: 14px; left: 14px;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+  .corners::after   { top: 14px; right: 14px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+  .corners span::before { bottom: 14px; left: 14px;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+  .corners span::after  { bottom: 14px; right: 14px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+  /* ── BUTTONS ── */
+  .btn-start {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 16px;
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    box-shadow: 0 4px 16px #05966944;
+  }
+  .btn-stop {
+    display: none;
+    width: 100%;
+    margin-top: 14px;
+    padding: 14px;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ── RESULT CARD ── */
+  .result-card {
+    display: none;
+    margin-top: 18px;
+    background: #1e293b;
+    border: 1.5px solid #334155;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .result-header {
+    background: linear-gradient(135deg, #064e3b, #065f46);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .result-header .badge {
+    background: #34d399;
+    color: #022c22;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+  .result-header .name {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #a7f3d0;
+  }
+  .result-header .empid {
+    font-size: 0.75rem;
+    color: #6ee7b7;
+    margin-top: 1px;
+  }
+  .result-rows { padding: 4px 0; }
+  .result-row {
+    display: flex;
+    border-bottom: 1px solid #1e293b;
+    padding: 9px 16px;
+    gap: 8px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .rk {
+    flex: 0 0 44%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding-top: 1px;
+  }
+  .result-row .rv {
+    flex: 1;
+    font-size: 0.83rem;
+    color: #e2e8f0;
+    font-weight: 500;
+    word-break: break-word;
+  }
+
+  /* device type badge */
+  .dtype-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .dtype-PC      { background: #1d4ed8; color: #bfdbfe; }
+  .dtype-Laptop  { background: #065f46; color: #a7f3d0; }
+  .dtype-Store   { background: #4c1d95; color: #ddd6fe; }
+
+  /* action buttons */
+  .action-btns {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #334155;
+    background: #0f172a;
+  }
+  .action-btns button {
+    flex: 1;
+    padding: 11px 6px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-scan-again { background: #334155; color: #e2e8f0; }
+
+  /* ── TOAST ── */
+  .toast {
+    display: none;
+    position: fixed;
+    top: 16px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    padding: 11px 22px;
+    border-radius: 30px;
+    font-size: 0.83rem;
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.success { background: #065f46; color: #a7f3d0; }
+  .toast.error   { background: #7f1d1d; color: #fca5a5; }
+  .toast.info    { background: #1e3a5f; color: #93c5fd; }
+
+  /* ── LOADING ── */
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 3px solid #ffffff44;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── PERMISSION HELP ── */
+  .perm-help {
+    display: none;
+    margin-top: 14px;
+    background: #451a03;
+    border: 1.5px solid #92400e;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 0.8rem;
+    color: #fcd34d;
+    line-height: 1.6;
+  }
+  .perm-help strong { color: #fbbf24; display: block; margin-bottom: 6px; }
+  .perm-help ol { padding-left: 18px; color: #fde68a; }
+  .perm-help li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<div class="header">
+  <h1>📷 Device Barcode Scanner</h1>
+  <p>Scan karo → Employee details jo</p>
+</div>
+
+<!-- URL BAR -->
+<div class="url-bar">
+  <input type="url" id="scriptUrl" placeholder="Google Script URL paste karo..." inputmode="url">
+  <button class="btn-connect" onclick="saveUrl()">Connect</button>
+</div>
+<div class="connected-badge" id="connectedBadge">✅ Google Sheets Connected</div>
+
+<div class="content">
+
+  <!-- CAMERA -->
+  <div class="camera-wrap" id="cameraWrap">
+    <div class="camera-placeholder" id="camPlaceholder">
+      <div class="icon">📷</div>
+      <p>Camera Start કરો</p>
+      <p style="margin-top:6px;font-size:0.72rem;">barcode સ્કેન કરો → details આવશે</p>
+    </div>
+    <div id="reader"></div>
+    <div class="scan-line" id="scanLine"></div>
+    <div class="corners" id="corners"><span></span></div>
+  </div>
+
+  <button class="btn-start" id="btnStart" onclick="startScan()">▶ Camera Start</button>
+  <button class="btn-stop"  id="btnStop"  onclick="stopScan()">⏹ Stop Camera</button>
+
+  <!-- PERMISSION HELP -->
+  <div class="perm-help" id="permHelp">
+    <strong>⚠️ Camera permission denied — આ steps follow karo:</strong>
+    <ol>
+      <li>File <strong>WhatsApp / file manager</strong> માંથી open <strong>ના</strong> કરો</li>
+      <li>File phone storage માં save કરો</li>
+      <li><strong>Chrome browser</strong> open karo → address bar ma <code>file://</code> type karo → file select karo</li>
+      <li>Camera permission popup આવે → <strong>Allow</strong> tap karo</li>
+    </ol>
+  </div>
+
+  <!-- RESULT CARD -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header" id="resultHeader"></div>
+    <div class="result-rows" id="resultRows"></div>
+    <div class="action-btns">
+      <button class="btn-scan-again" onclick="scanAgain()">🔄 ફરી Scan</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let scriptUrl = '';
+let scanner = null;
+let scanning = false;
+let lastCode = '';
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('scanner_url') || '';
+  if (saved) {
+    scriptUrl = saved;
+    document.getElementById('scriptUrl').value = saved;
+    showConnected(true);
+  }
+});
+
+function saveUrl() {
+  const v = document.getElementById('scriptUrl').value.trim();
+  if (!v || !v.startsWith('http')) { toast('⚠️ Valid URL nakho', 'error'); return; }
+  scriptUrl = v;
+  localStorage.setItem('scanner_url', v);
+  showConnected(true);
+  toast('✅ Connected!', 'success');
+}
+
+function showConnected(yes) {
+  document.getElementById('connectedBadge').style.display = yes ? 'block' : 'none';
+}
+
+// ── SCANNER ──
+function startScan() {
+  if (!scriptUrl) { toast('⚠️ Pehela Google Sheet URL connect karo!', 'error'); return; }
+  if (scanning) return;
+
+  document.getElementById('camPlaceholder').style.display = 'none';
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = 'block';
+  document.getElementById('scanLine').classList.add('active');
+  document.getElementById('corners').classList.add('active');
+  document.getElementById('permHelp').style.display = 'none';
+  document.getElementById('resultCard').style.display = 'none';
+  lastCode = '';
+
+  scanner = new Html5Qrcode("reader");
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 12, qrbox: { width: 250, height: 140 } },
+    onScanSuccess,
+    () => {}
+  ).catch(err => {
+    const msg = String(err);
+    if (msg.includes('Permission') || msg.includes('NotAllowed') || msg.includes('denied')) {
+      document.getElementById('permHelp').style.display = 'block';
+      toast('❌ Camera permission denied', 'error');
+    } else {
+      toast('❌ Camera error: ' + msg.substring(0, 60), 'error');
+    }
+    resetUI();
+  });
+  scanning = true;
+}
+
+function stopScan() {
+  if (scanner && scanning) {
+    scanner.stop().catch(() => {});
+    scanning = false;
+  }
+  resetUI();
+}
+
+function resetUI() {
+  scanning = false;
+  document.getElementById('camPlaceholder').style.display = '';
+  document.getElementById('btnStart').style.display = 'block';
+  document.getElementById('btnStop').style.display = 'none';
+  document.getElementById('scanLine').classList.remove('active');
+  document.getElementById('corners').classList.remove('active');
+}
+
+async function onScanSuccess(code) {
+  if (code === lastCode) return;
+  lastCode = code;
+  stopScan();
+  toast('✅ Scanned!', 'success');
+  await fetchRecord(code.trim());
+}
+
+function scanAgain() {
+  document.getElementById('resultCard').style.display = 'none';
+  lastCode = '';
+}
+
+// ── FETCH FROM GOOGLE SHEET ──
+async function fetchRecord(empId) {
+  const btn = document.getElementById('btnStart');
+  btn.innerHTML = '<span class="spinner"></span>Fetching...';
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ __action: 'fetch', 'Emp ID': empId })
+    });
+    const result = await resp.json();
+    if (result.status !== 'success') throw new Error(result.message || 'Record mali nathi');
+    showResult(result.data);
+  } catch(err) {
+    toast('❌ ' + err.message, 'error');
+  } finally {
+    btn.innerHTML = '▶ Camera Start';
+    btn.disabled = false;
+    document.getElementById('btnStart').style.display = 'block';
+  }
+}
+
+// ── SHOW RESULT ──
+function showResult(d) {
+  const dtype = d['Device Type'] || '';
+
+  // Header
+  document.getElementById('resultHeader').innerHTML = `
+    <div>
+      <div class="name">${d['Emp Name'] || '—'}</div>
+      <div class="empid">ID: ${d['Emp ID'] || '—'} &nbsp;|&nbsp; ${d['Plant Name'] || ''} &nbsp;|&nbsp; ${d['Department'] || ''}</div>
+    </div>
+    <div style="margin-left:auto;">
+      <span class="dtype-badge dtype-${dtype}">${dtype || '—'}</span>
+    </div>`;
+
+  // Rows — show relevant fields based on device type
+  const allFields = [
+    { k: 'Serial No.',          always: true },
+    { k: 'Location',            always: true },
+    { k: 'Laptop Model No.',    type: 'Laptop' },
+    { k: 'Laptop Serial No.',   type: 'Laptop' },
+    { k: 'Device Serial No.',   type: 'PC' },
+    { k: 'Device Brand',        type: 'PC' },
+    { k: 'Display Model No.',   type: 'PC' },
+    { k: 'Display Serial No.',  type: 'PC' },
+    { k: 'Keyboard Brand',      type: 'PC' },
+    { k: 'Keyboard Serial No.', type: 'PC' },
+    { k: 'Mouse Brand',         type: 'PC' },
+    { k: 'Mouse Serial No.',    type: 'PC' },
+    { k: 'Store Model No.',     type: 'Store' },
+    { k: 'Store Serial No.',    type: 'Store' },
+    { k: 'Store Material Type', type: 'Store' },
+    { k: 'Store PR No.',        type: 'Store' },
+    { k: 'Store PO No.',        type: 'Store' },
+    { k: 'Date',                always: true },
+    { k: 'Time',                always: true },
+  ];
+
+  let html = '';
+  allFields.forEach(f => {
+    const show = f.always || f.type === dtype;
+    if (show && d[f.k]) {
+      html += `<div class="result-row">
+        <div class="rk">${f.k}</div>
+        <div class="rv">${d[f.k]}</div>
+      </div>`;
+    }
+  });
+
+  document.getElementById('resultRows').innerHTML = html;
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── TOAST ──
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, 4000);
+}
+</script>
+</body>
+</html>
